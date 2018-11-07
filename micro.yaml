@@ -1,0 +1,119 @@
+general:
+  name: svc-eco2-data-reconciliation
+  docs: https://github.com/BoseCorp/svc-eco2-data-reconciliation
+  core-platform: 0.2
+  quota-group: fortis
+  contacts:
+  - rick_schnur@bose.com
+
+containers:
+
+- name: eco2-data-reconciliation-core
+  dir: "."
+  compileCmd: mvn clean install
+  unitTestCmd: mvn test
+  healthCheck:
+    # perform an http GET on this port/path, 200-299 return is a success, all else is failure
+    httpGet:
+      path: '/health_check'
+      port: 9090
+    # give the container this many seconds to start up before starting health checks
+    initialDelaySeconds: 150
+  memory:
+    min: 1024
+    max: 2048
+  cpu:
+    min: 0.1
+    max: 0.5
+  envVars:
+    LOG_LEVEL: INFO
+  # prod envvars
+    prodeco2integrationdburl: 'jdbc:mysql://eco2-dev-integration-db.ccojuzif8qbx.us-east-1.rds.amazonaws.com:3306/BoseIntegrationDB'
+    prodeco2statedburl: 'jdbc:mysql://eco2-prod-state.ccojuzif8qbx.us-east-1.rds.amazonaws.com:3306/Eco2State'
+  # dev envvars
+    deveco2integrationdburl: 'jdbc:mysql://eco2-dev-integration-db.ccojuzif8qbx.us-east-1.rds.amazonaws.com:3306/BoseIntegrationDB'
+    deveco2statedburl: 'jdbc:mysql://eco2-dev-events-db.ccojuzif8qbx.us-east-1.rds.amazonaws.com:3306/Eco2State'
+  secrets:
+  # prod secrets
+  - name: prodeco2statedbpw
+    envvar-name: prodeco2statedbpw
+    access-as: envVar
+    prefixed: false
+  - name: prodeco2statedbusername
+    envvar-name: prodeco2statedbusername
+    access-as: envVar
+    prefixed: false
+  # dev secrets
+  - name: deveco2statedbpw
+    envvar-name: deveco2statedbpw
+    access-as: envVar
+    prefixed: false
+  - name: deveco2statedbusername
+    envvar-name: deveco2statedbusername
+    access-as: envVar
+    prefixed: false
+- name: func-test
+  dir: tests/functional
+  memory:
+    min: 256
+    max: 512
+  cpu:
+    min: 0.1
+    max: 0.3
+
+components:
+
+- name: eco2-data-reconciliation-core
+  type: stateless
+  public: true
+  instances: 0
+  containers:
+  - eco2-data-reconciliation-core
+  expose:
+  - containerPort: 9090
+    servicePort: 9090
+    protocol: TCP
+    name: uptime
+  uptimePath: '/health_check'
+
+tests:
+- name: functional
+  containers: [func-test]
+
+dependencies: 
+  - service: svc-id-gen-priv
+    default: prod
+    ingress: local
+    overrides:
+      - environment: stable-test
+        select: prod
+      - environment: integration
+        select: prod
+      - environment: prod
+        select: prod
+    components:
+      - component: id-account-attrs-core
+        envVar: USER_REGISTRY_URI
+  - service: svc-id-registry-priv
+    default: prod
+    ingress: local
+    overrides:
+      - environment: stable-test
+        select: prod
+      - environment: integration
+        select: prod
+      - environment: prod
+        select: prod
+    components:
+      - component: id-product-registry-core
+        envVar: PROD_REGISTRY_URI
+
+advanced:
+  env-modifiers:
+  - name: 'production reconciliation'
+    env-regex: '^(prod).*$'
+    modifier:
+      containers:
+        name: eco2-data-reconciliation-core
+        envVars:
+            sample: 'sample_value'

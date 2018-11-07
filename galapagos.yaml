@@ -1,0 +1,32 @@
+jenkins:
+  disableConcurrentBuilds: true
+
+deployments:
+- branch: ^(release.*)
+  testEnvironment: stage
+  testTeardown: false
+  tests: ['functional']
+  deployEnvironment: prod
+  skipStateful: true
+
+- branch: ^feature(.*)
+  testEnvironment: 'feature[1]'
+  tests: ['functional']
+
+- branch: ^integration(.*)
+  testEnvironment: '[0]'
+  tests: ['functional']
+  deployEnvironment: 'i-[1]'
+
+- branch: master
+  testEnvironment: 'stable-test'
+  #tests: ['functional']
+  testTeardown: false
+
+- branch: (.*)
+  testEnvironment: [1]
+  tests: ['functional']
+  testTeardown: true
+
+
+
